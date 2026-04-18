@@ -1,0 +1,3465 @@
+<!doctype html>
+
+<html lang="zh-CN">
+
+<head>
+
+  <meta charset="utf-8" />
+
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+
+  <title>聊天记录查看器</title>
+
+  <style>
+
+    :root{
+
+      --bg: #FAF9F5;
+
+      --sidebar-bg: #F5F0E8;
+
+      --panel: rgba(255,255,255,.82);
+
+      --panel-2: rgba(255,255,255,.97);
+
+      --text: #3D3D3A;
+
+      --muted: rgba(61,61,58,.52);
+
+      --border: rgba(180,120,60,.14);
+
+      --orange: #E8651A;
+
+      --orange2: #F09050;
+
+      --bubble-human-bg: #F0EEE6;
+
+      --bubble-ai-bg: transparent;
+
+      --bubble-human-border: transparent;
+
+      --bubble-ai-border: transparent;
+
+      --thinking-bg: rgba(130,105,75,.05);
+
+      --highlight: #FFD580;
+
+      --shadow: 0 10px 32px rgba(28,25,23,.09);
+
+      --shadow2: 0 3px 12px rgba(28,25,23,.07);
+
+      --radius-lg: 16px;
+
+      --radius-md: 12px;
+
+      --sidebar-w: 280px;
+
+      --sidebar-collapsed-w: 52px;
+
+      --sidebar-transition: width .22s cubic-bezier(.4,0,.2,1);
+
+      --focus: 0 0 0 3px rgba(232,101,26,.20);
+
+      --msg-font-size: 13px;
+
+    }
+
+    [data-theme="dark"]{
+
+      --bg: #1C1917;
+
+      --sidebar-bg: #171310;
+
+      --panel: rgba(30,27,23,.90);
+
+      --panel-2: rgba(42,36,28,.97);
+
+      --text: rgba(250,245,235,.92);
+
+      --muted: rgba(250,245,235,.50);
+
+      --border: rgba(232,101,26,.14);
+
+      --bubble-human-bg: rgba(61,51,38,.70);
+
+      --bubble-ai-bg: transparent;
+
+      --bubble-human-border: transparent;
+
+      --bubble-ai-border: transparent;
+
+      --thinking-bg: rgba(200,170,120,.06);
+
+      --highlight: #C47800;
+
+      --shadow: 0 14px 38px rgba(0,0,0,.44);
+
+      --shadow2: 0 4px 14px rgba(0,0,0,.30);
+
+    }
+
+    *{ box-sizing:border-box; margin:0; padding:0; }
+
+    html,body{ height:100%; overflow:hidden; }
+
+    body{
+
+      font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, Roboto, Helvetica, Arial;
+
+      color:var(--text);
+
+      background: var(--bg);
+
+      display:flex;
+
+    }
+
+    /* ─── Sidebar ─── */
+
+    .sidebar{
+
+      width: var(--sidebar-w);
+
+      min-width: var(--sidebar-w);
+
+      height: 100%;
+
+      background: var(--sidebar-bg);
+
+      border-right: 1px solid var(--border);
+
+      display: flex;
+
+      flex-direction: column;
+
+      transition: var(--sidebar-transition);
+
+      overflow: hidden;
+
+      z-index: 30;
+
+      flex-shrink: 0;
+
+    }
+
+    .sidebar.collapsed{
+
+      width: var(--sidebar-collapsed-w);
+
+      min-width: var(--sidebar-collapsed-w);
+
+    }
+
+    /* B1 fix: sidebarTop — logo hidden when collapsed, toggle always visible */
+
+    .sidebarTop{
+
+      display:flex;
+
+      align-items:center;
+
+      gap:10px;
+
+      padding: 14px 12px;
+
+      border-bottom: 1px solid var(--border);
+
+      flex-shrink:0;
+
+      min-height:56px;
+
+    }
+
+    .logo{
+
+      width:30px; height:30px;
+
+      border-radius:10px;
+
+      background: linear-gradient(140deg,#E8651A 0%,#C44010 100%);
+
+      box-shadow: 0 3px 10px rgba(232,101,26,.30);
+
+      display:grid;
+
+      place-items:center;
+
+      color:#fff;
+
+      font-weight:800;
+
+      font-size:14px;
+
+      flex-shrink:0;
+
+      user-select:none;
+
+    }
+
+    .sidebarSpacer{ flex:1; }
+
+    /* M2: brand text removed. B1: hide logo in collapsed so toggle stays centered */
+
+    .sidebar.collapsed .logo{ display:none; }
+
+    .sidebar.collapsed .sidebarSpacer{ display:none; }
+
+    .sidebar.collapsed .sidebarTop{ padding:13px 11px; justify-content:center; }
+
+    .toggleBtn{
+
+      width:30px; height:30px;
+
+      border:none;
+
+      background: transparent;
+
+      border-radius:8px;
+
+      cursor:pointer;
+
+      display:grid;
+
+      place-items:center;
+
+      color:var(--muted);
+
+      font-size:16px;
+
+      flex-shrink:0;
+
+      transition: background .14s, color .14s, transform .22s;
+
+      user-select:none;
+
+    }
+
+    .toggleBtn:hover{ background:#F0EEE6; color:var(--text); }
+
+    .sidebar.collapsed .toggleBtn{ transform: scaleX(-1); }
+
+    /* Sidebar actions */
+
+    .sidebarActions{
+
+      padding: 10px 10px 6px 10px;
+
+      display:flex;
+
+      flex-direction:column;
+
+      gap:4px;
+
+      flex-shrink:0;
+
+      border-bottom: 1px solid var(--border);
+
+    }
+
+    .sidebarBtn{
+
+      width:100%;
+
+      height:36px;
+
+      border-radius:10px;
+
+      border:1px solid rgba(180,120,60,.14);
+
+      background: rgba(255,255,255,.50);
+
+      color:var(--text);
+
+      cursor:pointer;
+
+      display:flex;
+
+      align-items:center;
+
+      gap:9px;
+
+      padding: 0 10px;
+
+      font-size:13px;
+
+      font-weight:700;
+
+      user-select:none;
+
+      white-space:nowrap;
+
+      overflow:hidden;
+
+      transition: background .14s, border-color .14s;
+
+    }
+
+    [data-theme="dark"] .sidebarBtn{ background:rgba(255,255,255,.05); }
+
+    .sidebarBtn:hover{ background:#F0EEE6; border-color:rgba(180,120,60,.22); color:var(--text); }
+
+    .sidebarBtn .btn-icon{ font-size:15px; flex-shrink:0; }
+
+    .sidebarBtn .btn-label{ overflow:hidden; text-overflow:ellipsis; }
+
+    .sidebar.collapsed .sidebarBtn{ justify-content:center; padding:0; }
+
+    .sidebar.collapsed .btn-label{ display:none; }
+
+    /* View tabs — 4 tabs */
+
+    .viewTabs{
+
+      display:flex;
+
+      gap:3px;
+
+      padding:8px 8px 4px 8px;
+
+      flex-shrink:0;
+
+    }
+
+    .sidebar.collapsed .viewTabs{ flex-direction:column; align-items:center; }
+
+    .viewTab{
+
+      flex:1;
+
+      min-width:0;
+
+      height:34px;
+
+      border:none;
+
+      background:transparent;
+
+      border-radius:9px;
+
+      cursor:pointer;
+
+      font-size:11px;
+
+      font-weight:800;
+
+      color:var(--muted);
+
+      transition:color .14s,background .14s;
+
+      user-select:none;
+
+      display:flex;
+
+      align-items:center;
+
+      justify-content:center;
+
+      gap:3px;
+
+      white-space:nowrap;
+
+      overflow:hidden;
+
+      padding:0 3px;
+
+    }
+
+    .viewTab.active{ color:var(--text); background:#F0EEE6; }
+
+    .viewTab:hover:not(.active){ background:#F0EEE6; color:var(--text); }
+
+    .sidebar.collapsed .viewTab .tab-label{ display:none; }
+
+    .sidebar.collapsed .viewTab{ flex:none; width:36px; height:34px; padding:0; }
+
+    /* Stats strip */
+
+    .statsStrip{
+
+      padding: 2px 10px 8px 10px;
+
+      font-size:11px;
+
+      color:var(--muted);
+
+      font-weight:700;
+
+      white-space:nowrap;
+
+      overflow:hidden;
+
+      text-overflow:ellipsis;
+
+      flex-shrink:0;
+
+    }
+
+    .sidebar.collapsed .statsStrip{ display:none; }
+
+    /* Sidebar list */
+
+    .sidebarList{
+
+      flex:1;
+
+      overflow-y:auto;
+
+      overflow-x:hidden;
+
+      padding: 6px 8px 16px 8px;
+
+    }
+
+    .sidebarList::-webkit-scrollbar{ width:4px; }
+
+    .sidebarList::-webkit-scrollbar-track{ background:transparent; }
+
+    .sidebarList::-webkit-scrollbar-thumb{ background:rgba(180,130,70,.22); border-radius:4px; }
+
+    /* Conv item */
+
+    .convItem{
+
+      padding: 9px 10px;
+
+      border-radius:11px;
+
+      border:1px solid transparent;
+
+      cursor:pointer;
+
+      transition:background .14s,border-color .14s;
+
+      margin-bottom:3px;
+
+      user-select:none;
+
+    }
+
+    .convItem:hover{ background:#F0EEE6; border-color:rgba(180,120,60,.18); }
+
+    .convItem.active{ background:#F0EEE6; border-color:rgba(180,120,60,.28); }
+
+    .convItemTitle{
+
+      font-size:13px; font-weight:700; line-height:1.3;
+
+      overflow:hidden;
+
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+
+      color:var(--text);
+
+    }
+
+    .convItem.active .convItemTitle{ color:var(--text); }
+
+    .convItemMeta{ margin-top:4px; font-size:11px; color:var(--muted); display:flex; gap:8px; white-space:nowrap; overflow:hidden; }
+
+    .sidebar.collapsed .convItemTitle{ display:none; }
+
+    .sidebar.collapsed .convItemMeta{ display:none; }
+
+    .sidebar.collapsed .convItem{ width:36px; height:36px; display:grid; place-items:center; padding:0; overflow:hidden; border-radius:10px; margin-bottom:3px; }
+
+    .convItem .collapsedDot{ display:none; width:8px; height:8px; border-radius:50%; background:var(--muted); }
+
+    .convItem.active .collapsedDot{ background:var(--text); }
+
+    .sidebar.collapsed .convItem .collapsedDot{ display:block; }
+
+    /* M3: Month group */
+
+    .monthGroup{ margin-bottom:2px; }
+
+    .monthGroupHeader{
+
+      display:flex; align-items:center; gap:6px;
+
+      padding:6px 8px;
+
+      border-radius:9px;
+
+      cursor:pointer; user-select:none;
+
+      font-size:11.5px; font-weight:800; color:var(--text);
+
+      transition:background .14s;
+
+    }
+
+    .monthGroupHeader:hover{ background:#F0EEE6; }
+
+    .monthGroupChev{ font-size:9px; opacity:.65; transition:transform .15s; flex-shrink:0; }
+
+    .monthGroup.open .monthGroupChev{ transform:rotate(90deg); }
+
+    .monthGroupLabel{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .monthGroupMeta{ font-size:10px; color:var(--muted); font-weight:700; white-space:nowrap; }
+
+    .monthGroupDays{ display:none; padding-left:8px; }
+
+    .monthGroup.open .monthGroupDays{ display:block; }
+
+    .sidebar.collapsed .monthGroupHeader{ display:none; }
+
+    .sidebar.collapsed .monthGroupDays{ display:block; padding-left:0; }
+
+    /* Timeline day item */
+
+    .timelineDay{
+
+      padding:7px 10px;
+
+      border-radius:11px;
+
+      border:1px solid transparent;
+
+      cursor:pointer;
+
+      transition:background .14s,border-color .14s;
+
+      margin-bottom:3px;
+
+      user-select:none;
+
+    }
+
+    .timelineDay:hover{ background:#F0EEE6; border-color:rgba(180,120,60,.18); }
+
+    .timelineDay.active{ background:#F0EEE6; border-color:rgba(180,120,60,.28); }
+
+    .timelineDayDate{ font-size:12.5px; font-weight:800; color:var(--text); }
+
+    .timelineDay.active .timelineDayDate{ color:var(--text); }
+
+    .timelineDayMeta{ margin-top:2px; font-size:11px; color:var(--muted); }
+
+    .sidebar.collapsed .timelineDayDate{ display:none; }
+
+    .sidebar.collapsed .timelineDayMeta{ display:none; }
+
+    .sidebar.collapsed .timelineDay{ width:36px; height:36px; display:grid; place-items:center; padding:0; border-radius:10px; }
+
+    .timelineDay .collapsedDot{ display:none; width:8px; height:8px; border-radius:50%; background:var(--muted); }
+
+    .timelineDay.active .collapsedDot{ background:var(--text); }
+
+    .sidebar.collapsed .timelineDay .collapsedDot{ display:block; }
+
+    /* Sidebar bottom */
+
+    .sidebarBottom{
+
+      padding:8px;
+
+      border-top:1px solid var(--border);
+
+      display:flex; gap:5px; flex-wrap:wrap;
+
+      flex-shrink:0;
+
+    }
+
+    .sidebar.collapsed .sidebarBottom{ flex-direction:column; align-items:center; gap:4px; }
+
+    .iconBtn{
+
+      flex:1; min-width:0;
+
+      height:34px;
+
+      border-radius:9px;
+
+      border:1px solid rgba(180,120,60,.14);
+
+      background:transparent;
+
+      color:var(--muted);
+
+      cursor:pointer;
+
+      display:flex; align-items:center; justify-content:center; gap:5px;
+
+      font-size:12px; font-weight:700;
+
+      user-select:none;
+
+      white-space:nowrap; overflow:hidden;
+
+      transition:background .14s,color .14s;
+
+    }
+
+    .iconBtn:hover{ background:#F0EEE6; color:var(--text); }
+
+    .iconBtn .icon-label{ overflow:hidden; text-overflow:ellipsis; font-size:11.5px; }
+
+    .sidebar.collapsed .iconBtn .icon-label{ display:none; }
+
+    .sidebar.collapsed .iconBtn{ flex:none; width:36px; height:32px; }
+
+    /* ─── Main area ─── */
+
+    .main{
+
+      flex:1; min-width:0; height:100%;
+
+      display:flex; flex-direction:column;
+
+      background:
+
+        radial-gradient(900px 500px at 12% 10%, rgba(232,101,26,.07), transparent 55%),
+
+        radial-gradient(700px 400px at 90% 15%, rgba(200,150,80,.06), transparent 55%),
+
+        var(--bg);
+
+    }
+
+    /* Main topbar */
+
+    .mainTop{
+
+      height:52px;
+
+      display:flex; align-items:center; gap:10px;
+
+      padding:0 14px;
+
+      border-bottom:1px solid var(--border);
+
+      flex-shrink:0;
+
+      backdrop-filter:blur(12px);
+
+      -webkit-backdrop-filter:blur(12px);
+
+      background:rgba(250,249,245,.75);
+
+    }
+
+    [data-theme="dark"] .mainTop{ background:rgba(28,25,23,.82); }
+
+    .mainTopTitle{ flex:1; min-width:0; }
+
+    .mainTopTitle .name{ font-size:14px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .mainTopTitle .sub{ font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* Search */
+
+    .searchWrap{ display:flex; align-items:center; gap:8px; }
+
+    .search{ position:relative; }
+
+    .search input{
+
+      height:34px; width:200px;
+
+      border-radius:999px;
+
+      padding:0 36px 0 36px;
+
+      border:1px solid rgba(180,120,60,.16);
+
+      background:var(--panel-2);
+
+      color:var(--text);
+
+      outline:none;
+
+      font-size:12.5px;
+
+      transition:width .2s,box-shadow .18s;
+
+    }
+
+    .search input:focus{ width:240px; box-shadow:var(--focus); border-color:rgba(232,101,26,.38); }
+
+    .search .s-icon{ position:absolute; left:11px; top:50%; transform:translateY(-50%); opacity:.60; pointer-events:none; font-size:13px; }
+
+    .search .clearBtn{ position:absolute; right:8px; top:50%; transform:translateY(-50%); border:none; background:transparent; cursor:pointer; opacity:.55; padding:4px 5px; border-radius:999px; color:var(--text); font-size:11px; }
+
+    .search .clearBtn:hover{ opacity:.9; }
+
+    .pill{ display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; background:rgba(180,150,80,.08); border:1px solid rgba(180,150,80,.14); color:var(--muted); font-weight:700; font-size:11px; white-space:nowrap; }
+
+    /* Content */
+
+    .content{ flex:1; overflow:auto; padding:14px 16px 80px 16px; position:relative; }
+
+    .content::-webkit-scrollbar{ width:5px; }
+
+    .content::-webkit-scrollbar-track{ background:transparent; }
+
+    .content::-webkit-scrollbar-thumb{ background:rgba(180,130,70,.20); border-radius:4px; }
+
+    /* Empty state */
+
+    .emptyState{ height:100%; display:flex; align-items:center; justify-content:center; padding:24px; }
+
+    .dropCard{ width:min(680px,100%); border-radius:20px; padding:24px; background:var(--panel); border:1.5px dashed rgba(232,101,26,.22); box-shadow:var(--shadow); text-align:center; }
+
+    .dropCard h2{ font-size:16px; font-weight:900; margin-bottom:8px; }
+
+    .dropCard p{ font-size:13px; line-height:1.55; color:var(--muted); margin:5px 0; }
+
+    .dropCard .btns{ margin-top:16px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+
+    /* Buttons */
+
+    .btn{ height:36px; padding:0 14px; border-radius:999px; border:1px solid rgba(180,120,60,.18); background:var(--panel-2); color:var(--text); cursor:pointer; display:flex; align-items:center; gap:7px; font-weight:700; font-size:13px; user-select:none; transition:transform .10s,background .14s; white-space:nowrap; }
+
+    .btn:hover{ transform:translateY(-1px); }
+
+    .btn.primary{ border-color:rgba(232,101,26,.24); background:rgba(232,101,26,.09); }
+
+    .btn.primary:hover{ background:rgba(232,101,26,.16); }
+
+    .btn.export-btn{ border-color:rgba(232,101,26,.28); background:rgba(232,101,26,.09); color:var(--orange); font-weight:800; }
+
+    .btn.export-btn:hover{ background:rgba(232,101,26,.16); }
+
+    /* M1: Bubbles */
+
+    .msgRow{ display:flex; margin:8px 0; gap:8px; align-items:flex-start; }
+
+    .msgRow.human{ justify-content:flex-end; }
+
+    .msgRow.ai{ justify-content:flex-start; }
+
+    .bubble{
+
+      max-width:min(780px,88%);
+
+      border-radius:16px;
+
+      padding:10px 13px;
+
+      word-break:break-word;
+
+      position:relative;
+
+    }
+
+    .bubble.human{
+
+      background:var(--bubble-human-bg);
+
+      border-radius:16px 16px 4px 16px;
+
+    }
+
+    .bubble.ai{
+
+      background:var(--bubble-ai-bg);
+
+      border-radius:16px 16px 16px 4px;
+
+    }
+
+    .bubble:hover{ background-color: inherit; }
+
+    .bubble.human:hover{ background:var(--bubble-human-bg); }
+
+    /* A4: Star button */
+
+    .starBtn{
+
+      position:absolute; top:6px; right:6px;
+
+      width:22px; height:22px;
+
+      border:none; background:transparent;
+
+      cursor:pointer; border-radius:999px;
+
+      display:flex; align-items:center; justify-content:center;
+
+      font-size:12px;
+
+      opacity:0;
+
+      transition:opacity .15s, transform .10s;
+
+      padding:0; z-index:2; line-height:1;
+
+    }
+
+    .bubble:hover .starBtn{ opacity:0.45; }
+
+    .starBtn:hover{ opacity:1 !important; transform:scale(1.2); }
+
+    .starBtn.starred{ opacity:1 !important; }
+
+    .bubbleHeader{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:5px; }
+
+    .senderTag{
+
+      display:inline-flex; align-items:center; gap:5px;
+
+      padding:2px 8px; border-radius:999px;
+
+      font-weight:900; font-size:11px;
+
+      color:var(--text);
+
+    }
+
+    .senderTag.human{ border:1px solid rgba(232,101,26,.22); background:rgba(232,101,26,.10); }
+
+    .senderTag.ai{ border:none; background:transparent; padding-left:0; color:var(--muted); }
+
+    .bubbleTime{ font-size:11px; color:var(--muted); font-family:ui-monospace,monospace; opacity:.80; }
+
+    .bubbleBody{ font-size:var(--msg-font-size); line-height:1.65; white-space:pre-wrap; }
+
+    /* Thinking */
+
+    .thinkingWrap{ margin:7px 0 9px 0; border-radius:12px; overflow:hidden; border:1px solid rgba(130,105,75,.14); background:var(--thinking-bg); }
+
+    .thinkingToggle{ width:100%; display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:none; cursor:pointer; background:transparent; color:var(--text); font-weight:900; font-size:12px; user-select:none; gap:10px; }
+
+    .thinkingContent{ padding:9px 10px; border-top:1px solid rgba(130,105,75,.10); display:none; font-size:12.5px; line-height:1.62; color:var(--muted); white-space:pre-wrap; }
+
+    .thinkingWrap.open .thinkingContent{ display:block; }
+
+    .chev{ opacity:.60; transition:transform .15s; }
+
+    .thinkingWrap.open .chev{ transform:rotate(90deg); opacity:.85; }
+
+    mark{ background:var(--highlight); color:#1a1a1a; padding:0 .12em; border-radius:4px; }
+
+    /* Timeline sep */
+
+    .timelineSep{ display:flex; align-items:center; gap:10px; margin:20px 0 10px 0; font-size:12.5px; font-weight:900; color:var(--orange); }
+
+    .timelineSep::before,.timelineSep::after{ content:''; flex:1; height:1px; background:rgba(232,101,26,.16); }
+
+    /* M4: Collapsible conversation blocks in day view */
+
+    .convBlock{ margin-bottom:12px; border-radius:14px; overflow:hidden; border:1px solid rgba(180,120,60,.12); }
+
+    .convBlockHeader{
+
+      display:flex; align-items:center; gap:8px;
+
+      padding:10px 14px;
+
+      cursor:pointer; user-select:none;
+
+      background:rgba(180,120,60,.06);
+
+      font-size:12.5px; font-weight:800; color:var(--text);
+
+      transition:background .14s;
+
+    }
+
+    [data-theme="dark"] .convBlockHeader{ background:rgba(255,255,255,.04); }
+
+    .convBlockHeader:hover{ background:rgba(232,101,26,.08); }
+
+    .convBlockChev{ opacity:.6; transition:transform .15s; font-size:10px; flex-shrink:0; }
+
+    .convBlock.open .convBlockChev{ transform:rotate(90deg); }
+
+    .convBlockTitle{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .convBlockCount{ font-size:11px; color:var(--muted); font-weight:700; white-space:nowrap; }
+
+    .convBlockBody{ display:none; padding:6px 8px 4px; }
+
+    .convBlock.open .convBlockBody{ display:block; }
+
+    /* Export bar */
+
+    .exportBar{ display:flex; justify-content:center; padding:18px 0 8px 0; border-top:1px solid rgba(180,120,60,.10); margin-top:14px; }
+
+    /* Floating scroll buttons */
+
+    .floatBtns{ position:absolute; right:14px; bottom:14px; display:flex; flex-direction:column; gap:8px; z-index:10; pointer-events:none; }
+
+    .fab{ pointer-events:auto; width:38px; height:38px; border-radius:999px; border:1px solid rgba(180,120,60,.14); background:var(--panel-2); box-shadow:var(--shadow2); cursor:pointer; display:grid; place-items:center; color:var(--muted); font-size:15px; transition:transform .10s,color .14s; user-select:none; }
+
+    .fab:hover{ transform:translateY(-1px); color:var(--orange); }
+
+    /* Drop overlay */
+
+    .dropOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.42); display:none; align-items:center; justify-content:center; z-index:100; padding:20px; }
+
+    .dropOverlay.show{ display:flex; }
+
+    .dropOverlay .card{ width:min(680px,100%); background:var(--panel-2); border:2px dashed rgba(232,101,26,.42); border-radius:22px; box-shadow:var(--shadow); padding:22px; text-align:center; }
+
+    .dropOverlay .card h3{ font-size:18px; font-weight:950; margin-bottom:6px; }
+
+    .dropOverlay .card p{ color:var(--muted); font-weight:700; }
+
+    /* Mobile sidebar overlay */
+
+    .sidebarOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:29; }
+
+    /* ─── Settings Panel (A1, A2) ─── */
+
+    .settingsBg{ position:fixed; inset:0; background:rgba(0,0,0,.25); z-index:49; display:none; }
+
+    .settingsBg.show{ display:block; }
+
+    .settingsPanel{
+
+      position:fixed; top:0; right:0;
+
+      width:min(340px,100%); height:100%;
+
+      background:var(--panel-2);
+
+      border-left:1px solid var(--border);
+
+      box-shadow:var(--shadow);
+
+      z-index:50;
+
+      display:flex; flex-direction:column;
+
+      transform:translateX(100%);
+
+      transition:transform .25s cubic-bezier(.4,0,.2,1);
+
+    }
+
+    .settingsPanel.open{ transform:translateX(0); }
+
+    .settingsPanelHead{
+
+      display:flex; align-items:center; justify-content:space-between;
+
+      padding:16px 16px 14px;
+
+      border-bottom:1px solid var(--border);
+
+      flex-shrink:0;
+
+    }
+
+    .settingsPanelHead h2{ font-size:15px; font-weight:900; }
+
+    .spClose{ width:28px; height:28px; border:none; background:transparent; border-radius:8px; cursor:pointer; display:grid; place-items:center; color:var(--muted); font-size:14px; transition:background .14s; }
+
+    .spClose:hover{ background:rgba(232,101,26,.10); color:var(--orange); }
+
+    .settingsPanelBody{ flex:1; overflow-y:auto; padding:16px; }
+
+    .spSection{ margin-bottom:22px; }
+
+    .spSection h3{ font-size:11.5px; font-weight:900; color:var(--orange); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; }
+
+    .spRow{ margin-bottom:12px; }
+
+    .spRow label{ display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:5px; }
+
+    .spRow input[type=text], .spRow input[type=number]{
+
+      width:100%; height:36px; border-radius:10px;
+
+      border:1px solid var(--border);
+
+      background:var(--panel);
+
+      color:var(--text);
+
+      padding:0 12px; font-size:13px; outline:none;
+
+      transition:border-color .15s, box-shadow .15s;
+
+    }
+
+    .spRow input:focus{ border-color:rgba(232,101,26,.40); box-shadow:var(--focus); }
+
+    .spHint{ font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.5; }
+
+    .settingsPanelFoot{ padding:12px 16px; border-top:1px solid var(--border); flex-shrink:0; }
+
+    .spSaveBtn{ width:100%; height:38px; border-radius:12px; border:none; background:var(--orange); color:#fff; font-size:13px; font-weight:800; cursor:pointer; transition:opacity .14s; }
+
+    .spSaveBtn:hover{ opacity:.88; }
+
+    /* ─── Stats view (A3) ─── */
+
+    .statsView{ padding:2px 0; }
+
+    .statsViewHead{ margin-bottom:18px; }
+
+    .statsViewHead h2{ font-size:16px; font-weight:900; margin-bottom:4px; }
+
+    .statsViewHead p{ font-size:12.5px; color:var(--muted); }
+
+    .chartCard{ background:var(--panel); border-radius:16px; padding:16px; border:1px solid var(--border); margin-bottom:16px; }
+
+    .chartCard h3{ font-size:13px; font-weight:800; margin-bottom:14px; color:var(--text); }
+
+    .tableCard{ background:var(--panel); border-radius:16px; border:1px solid var(--border); overflow:hidden; }
+
+    .statsTable{ width:100%; border-collapse:collapse; font-size:12.5px; }
+
+    .statsTable th{ text-align:left; padding:9px 14px; font-size:10.5px; font-weight:900; color:var(--orange); text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); }
+
+    .statsTable td{ padding:8px 14px; border-bottom:1px solid rgba(180,120,60,.07); color:var(--text); }
+
+    .statsTable tr:last-child td{ border-bottom:none; }
+
+    /* ─── Favorites view (A4) ─── */
+
+    .favCard{
+
+      background:var(--panel);
+
+      border:1px solid var(--border);
+
+      border-radius:14px;
+
+      padding:14px;
+
+      margin-bottom:10px;
+
+    }
+
+    .favCardMeta{ font-size:11px; color:var(--muted); font-weight:700; margin-bottom:7px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+
+    .favCardSender{ font-weight:900; color:var(--orange); }
+
+    .favCardConv{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
+
+    .favCardText{ font-size:13px; line-height:1.6; color:var(--text); white-space:pre-wrap; word-break:break-word; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+
+    .favCardActions{ margin-top:10px; display:flex; gap:8px; align-items:center; }
+
+    .favJumpBtn{ height:30px; padding:0 12px; border-radius:999px; border:1px solid rgba(232,101,26,.26); background:rgba(232,101,26,.08); color:var(--orange); cursor:pointer; font-size:12px; font-weight:800; transition:background .14s; }
+
+    .favJumpBtn:hover{ background:rgba(232,101,26,.16); }
+
+    .favUnstarBtn{ width:28px; height:28px; border:none; background:transparent; cursor:pointer; border-radius:999px; font-size:14px; opacity:.55; transition:opacity .14s; }
+
+    .favUnstarBtn:hover{ opacity:1; }
+
+    /* Responsive */
+
+    @media (max-width:760px){
+
+      .sidebar{ position:fixed; left:0; top:0; height:100%; transform:translateX(-100%); transition:transform .22s cubic-bezier(.4,0,.2,1), width 0s; width:var(--sidebar-w) !important; min-width:var(--sidebar-w) !important; box-shadow:var(--shadow); }
+
+      .sidebar.mobile-open{ transform:translateX(0); }
+
+      .sidebarOverlay.show{ display:block; }
+
+      .main{ width:100%; }
+
+      .search input{ width:160px; }
+
+      .search input:focus{ width:180px; }
+
+      .mainTopTitle .sub{ display:none; }
+
+    }
+
+    .hidden{ display:none!important; }
+
+    .mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+
+  </style>
+
+</head>
+
+<body data-theme="light">
+
+  <!-- Settings panel (A1, A2) -->
+
+  <div class="settingsBg" id="settingsBg"></div>
+
+  <div class="settingsPanel" id="settingsPanel">
+
+```
+<div class="settingsPanelHead">
+
+  <h2>⚙️ 设置</h2>
+
+  <button class="spClose" id="spClose">✕</button>
+
+</div>
+
+<div class="settingsPanelBody">
+
+  <div class="spSection">
+
+    <h3>显示名称</h3>
+
+    <div class="spRow">
+
+      <label>用户昵称</label>
+
+      <input type="text" id="setHumanName" placeholder="我" maxlength="20" />
+
+    </div>
+
+    <div class="spRow">
+
+      <label>助手昵称</label>
+
+      <input type="text" id="setAiName" placeholder="TA" maxlength="20" />
+
+    </div>
+
+  </div>
+
+  <div class="spSection">
+
+    <h3>作息时间</h3>
+
+    <div class="spRow">
+
+      <label>自然日分割时间（小时，0–12）</label>
+
+      <input type="number" id="setDaySplit" placeholder="0" min="0" max="12" />
+
+      <div class="spHint">设为 3 即凌晨 3:00 前的消息归属于前一天。0 为标准午夜分割。</div>
+
+    </div>
+
+  </div>
+
+  <div class="spSection">
+
+    <h3>字体大小</h3>
+
+    <div class="spRow">
+
+      <label>正文字号：<span id="fontSizeLabel">13px</span></label>
+
+      <input type="range" id="setFontSize" min="11" max="20" step="1" value="13"
+
+        style="width:100%;margin-top:6px;accent-color:var(--orange);" />
+
+      <div class="spHint">调整消息正文字体大小，适配手机或大屏阅读。</div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<div class="settingsPanelFoot">
+
+  <button class="spSaveBtn" id="spSaveBtn">保存设置</button>
+
+</div>
+```
+
+  </div>
+
+  <!-- Mobile sidebar overlay -->
+
+  <div class="sidebarOverlay" id="sidebarOverlay"></div>
+
+  <!-- ─── Sidebar ─── -->
+
+  <div class="sidebar" id="sidebar">
+
+```
+<!-- M2: brand text removed, B1: logo hidden when collapsed so toggle stays visible -->
+
+<div class="sidebarTop">
+
+  <div class="logo">C</div>
+
+  <div class="sidebarSpacer"></div>
+
+  <button class="toggleBtn" id="toggleBtn" title="收起/展开侧边栏">◀</button>
+
+</div>
+
+<div class="sidebarActions">
+
+  <button class="sidebarBtn" id="reimportBtn" title="重新导入JSON">
+
+    <span class="btn-icon">⤾</span>
+
+    <span class="btn-label">重新导入</span>
+
+  </button>
+
+</div>
+
+<!-- 4 tabs: 对话 | 时间轴 | 统计 | 收藏 -->
+
+<div class="viewTabs">
+
+  <button class="viewTab active" id="tabConv"><span>📋</span><span class="tab-label">对话</span></button>
+
+  <button class="viewTab" id="tabTimeline"><span>📅</span><span class="tab-label">时间轴</span></button>
+
+  <button class="viewTab" id="tabStats"><span>📊</span><span class="tab-label">统计</span></button>
+
+  <button class="viewTab" id="tabFav"><span>⭐</span><span class="tab-label">收藏</span></button>
+
+</div>
+
+<div class="statsStrip" id="statsStrip">未导入</div>
+
+<div class="sidebarList" id="convList"></div>
+
+<div class="sidebarBottom">
+
+  <button class="iconBtn" id="themeBtn" title="日间/夜间"><span>🌙</span><span class="icon-label">夜间</span></button>
+
+  <button class="iconBtn" id="settingsBtn" title="设置"><span>⚙️</span><span class="icon-label">设置</span></button>
+
+</div>
+```
+
+  </div>
+
+  <!-- ─── Main ─── -->
+
+  <div class="main" id="main">
+
+```
+<div class="mainTop">
+
+  <button class="iconBtn" id="mobileSidebarBtn" style="display:none;flex:none;width:36px;" title="打开菜单">☰</button>
+
+  <div class="mainTopTitle">
+
+    <div class="name" id="currentConvTitle">尚未选择对话</div>
+
+    <div class="sub" id="currentConvSub"></div>
+
+  </div>
+
+  <div class="searchWrap">
+
+    <div class="search">
+
+      <span class="s-icon">🔎</span>
+
+      <input id="searchInput" type="search" placeholder="全局搜索…" autocomplete="off" />
+
+      <button id="clearSearchBtn" class="clearBtn" title="清空">✖</button>
+
+    </div>
+
+    <span id="searchBadge" class="pill hidden">🔎 0</span>
+
+  </div>
+
+</div>
+
+<div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column;">
+
+  <div class="content" id="content">
+
+    <div class="emptyState" id="emptyState">
+
+      <div class="dropCard" id="dropZone" tabindex="0">
+
+        <h2>把 <span class="mono">conversations.json</span> 拖进来就能看 ✅</h2>
+
+        <p>支持 Claude / ChatGPT 导出格式</p>
+
+        <p>拖拽上传 / 点击选择文件</p>
+
+        <p style="font-size:12px;margin-top:4px;">搜索框支持全局检索，侧边栏自动过滤结果</p>
+
+        <div class="btns">
+
+          <button class="btn primary" id="chooseBtn">📂 选择JSON文件</button>
+
+          <button class="btn" id="demoBtn">✨ 加载示例</button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="floatBtns">
+
+    <button class="fab" id="toBottomBtn" title="到达底部">⬇</button>
+
+    <button class="fab" id="toTopBtn" title="回到顶部">⬆</button>
+
+  </div>
+
+</div>
+```
+
+  </div>
+
+  <!-- Drop overlay -->
+
+  <div class="dropOverlay" id="dropOverlay">
+
+```
+<div class="card">
+
+  <h3>松手即可导入</h3>
+
+  <p>只支持 JSON 文件（conversations.json）</p>
+
+</div>
+```
+
+  </div>
+
+<script>
+
+(() => {
+
+  // ====== Settings (A1, A2, A8) ======
+
+  let settings = { humanName:'我', aiName:'TA', daySplitHour:0, fontSize:13 };
+
+  function loadSettings(){
+
+    try{
+
+      const s = JSON.parse(localStorage.getItem('cg_settings') || '{}');
+
+      settings.humanName    = s.humanName || '我';
+
+      settings.aiName       = s.aiName    || 'TA';
+
+      settings.daySplitHour = Math.max(0, Math.min(12, parseInt(s.daySplitHour) || 0));
+
+      settings.fontSize     = Math.max(11, Math.min(20, parseInt(s.fontSize) || 13));
+
+    }catch(e){}
+
+    applyFontSize();
+
+  }
+
+  function persistSettings(){
+
+    try{ localStorage.setItem('cg_settings', JSON.stringify(settings)); }catch(e){}
+
+  }
+
+  function applyFontSize(){
+
+    document.documentElement.style.setProperty('--msg-font-size', settings.fontSize + 'px');
+
+  }
+
+  // ====== Favorites (A4) ======
+
+  let favorites = new Set();   // keys "convOrigIdx::msgIdx"
+
+  let favMeta   = {};          // key -> { key, convOrigIdx, convTitle, snippet, dateStr, who }
+
+  function loadFavorites(){
+
+    try{
+
+      const arr = JSON.parse(localStorage.getItem('cg_favorites') || '[]');
+
+      favorites = new Set();
+
+      favMeta   = {};
+
+      arr.forEach(f => { favorites.add(f.key); favMeta[f.key] = f; });
+
+    }catch(e){}
+
+  }
+
+  function persistFavorites(){
+
+    try{ localStorage.setItem('cg_favorites', JSON.stringify(Object.values(favMeta))); }catch(e){}
+
+  }
+
+  // ====== State ======
+
+  let conversations  = [];
+
+  let convMeta       = [];
+
+  let timelineMeta   = [];
+
+  let selectedIndex  = -1;
+
+  let selectedDayKey = null;
+
+  let viewMode       = 'conv';
+
+  let searchQuery    = '';
+
+  let matchNodes     = [];
+
+  const els = {
+
+    sidebar:          document.getElementById('sidebar'),
+
+    sidebarOverlay:   document.getElementById('sidebarOverlay'),
+
+    toggleBtn:        document.getElementById('toggleBtn'),
+
+    mobileSidebarBtn: document.getElementById('mobileSidebarBtn'),
+
+    convList:         document.getElementById('convList'),
+
+    content:          document.getElementById('content'),
+
+    emptyState:       document.getElementById('emptyState'),
+
+    dropZone:         document.getElementById('dropZone'),
+
+    dropOverlay:      document.getElementById('dropOverlay'),
+
+    chooseBtn:        document.getElementById('chooseBtn'),
+
+    demoBtn:          document.getElementById('demoBtn'),
+
+    reimportBtn:      document.getElementById('reimportBtn'),
+
+    searchInput:      document.getElementById('searchInput'),
+
+    clearSearchBtn:   document.getElementById('clearSearchBtn'),
+
+    searchBadge:      document.getElementById('searchBadge'),
+
+    themeBtn:         document.getElementById('themeBtn'),
+
+    settingsBtn:      document.getElementById('settingsBtn'),
+
+    toTopBtn:         document.getElementById('toTopBtn'),
+
+    toBottomBtn:      document.getElementById('toBottomBtn'),
+
+    statsStrip:       document.getElementById('statsStrip'),
+
+    currentConvTitle: document.getElementById('currentConvTitle'),
+
+    currentConvSub:   document.getElementById('currentConvSub'),
+
+    tabConv:          document.getElementById('tabConv'),
+
+    tabTimeline:      document.getElementById('tabTimeline'),
+
+    tabStats:         document.getElementById('tabStats'),
+
+    tabFav:           document.getElementById('tabFav'),
+
+    settingsPanel:    document.getElementById('settingsPanel'),
+
+    settingsBg:       document.getElementById('settingsBg'),
+
+    spClose:          document.getElementById('spClose'),
+
+    spSaveBtn:        document.getElementById('spSaveBtn'),
+
+    setHumanName:     document.getElementById('setHumanName'),
+
+    setAiName:        document.getElementById('setAiName'),
+
+    setDaySplit:      document.getElementById('setDaySplit'),
+
+    setFontSize:      document.getElementById('setFontSize'),
+
+    fontSizeLabel:    document.getElementById('fontSizeLabel'),
+
+  };
+
+  // ====== Utilities ======
+
+  const clampStr = (s, max=140) => s.length > max ? s.slice(0, max-1) + '…' : s;
+
+  function sanitizeText(input){
+
+    let s = (input ?? '').toString();
+
+    s = s.replace(/^\s{0,3}(#{1,6})\s+/gm, '');
+
+    s = s.replace(/^\s{0,3}#{1,6}\s*/gm, '');
+
+    s = s.replace(/^\s{0,3}(-{3,}|\*{3,}|_{3,})\s*$/gm, '');
+
+    return s;
+
+  }
+
+  function safeTitle(input){
+
+    return clampStr(sanitizeText((input ?? '未命名对话').toString().trim()) || '未命名对话', 220);
+
+  }
+
+  function parseDate(input){
+
+    if (!input) return null;
+
+    const d = new Date(input);
+
+    return isNaN(d.getTime()) ? null : d;
+
+  }
+
+  function fmtDateTime(d){
+
+    if (!d) return '—';
+
+    try{ return d.toLocaleString(undefined, { year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit' }); }
+
+    catch{ return d.toISOString(); }
+
+  }
+
+  function fmtDate(d){
+
+    if (!d) return '—';
+
+    try{ return d.toLocaleString(undefined, { year:'numeric',month:'2-digit',day:'2-digit' }); }
+
+    catch{ return d.toISOString().slice(0,10); }
+
+  }
+
+  function fmtDateCN(dk){
+
+    if (!dk) return '—';
+
+    const [y,m,day] = dk.split('-');
+
+    return `${y}年${parseInt(m)}月${parseInt(day)}日`;
+
+  }
+
+  function fmtMonthCN(mk){
+
+    if (!mk) return '—';
+
+    const [y,m] = mk.split('-');
+
+    return `${y}年${parseInt(m)}月`;
+
+  }
+
+  function fmtTimeShort(d){
+
+    if (!d) return '—';
+
+    try{ return d.toLocaleString(undefined, { hour:'2-digit',minute:'2-digit' }); }
+
+    catch{ return ''; }
+
+  }
+
+  function numberWithCommas(x){
+
+    return (Number(x)||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+
+  }
+
+  function escapeForRegex(s){
+
+    return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+  }
+
+  // A2: effective date key with day-split
+
+  function getEffectiveDateKey(dateObj){
+
+    if (!dateObj) return null;
+
+    const sh = settings.daySplitHour || 0;
+
+    const adjusted = new Date(dateObj.getTime() - sh * 3600000);
+
+    return adjusted.toISOString().slice(0, 10);
+
+  }
+
+  // ====== Sidebar toggle (B1 fixed via CSS) ======
+
+  let sidebarCollapsed = false;
+
+  const isMobile = () => window.innerWidth <= 760;
+
+  function setSidebarCollapsed(val){
+
+    sidebarCollapsed = val;
+
+    if (isMobile()) return;
+
+    els.sidebar.classList.toggle('collapsed', val);
+
+    try{ localStorage.setItem('sidebar_collapsed', val ? '1' : '0'); }catch(e){}
+
+  }
+
+  function openMobileSidebar(){
+
+    els.sidebar.classList.add('mobile-open');
+
+    els.sidebarOverlay.classList.add('show');
+
+  }
+
+  function closeMobileSidebar(){
+
+    els.sidebar.classList.remove('mobile-open');
+
+    els.sidebarOverlay.classList.remove('show');
+
+  }
+
+  function handleResize(){
+
+    if (isMobile()){
+
+      els.mobileSidebarBtn.style.display = 'flex';
+
+      els.sidebar.classList.remove('collapsed');
+
+      els.sidebarOverlay.classList.remove('show');
+
+    } else {
+
+      els.mobileSidebarBtn.style.display = 'none';
+
+      els.sidebar.classList.remove('mobile-open');
+
+      els.sidebarOverlay.classList.remove('show');
+
+      els.sidebar.classList.toggle('collapsed', sidebarCollapsed);
+
+    }
+
+  }
+
+  // ====== File handling (B2 fixed: DOM-appended fresh input) ======
+
+  function openFilePicker(){
+
+    const input = document.createElement('input');
+
+    input.type = 'file';
+
+    input.accept = '.json,application/json';
+
+    input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+
+    input.onchange = async (e) => {
+
+      const f = e.target.files?.[0];
+
+      document.body.removeChild(input);
+
+      if (!f) return;
+
+      if (!isJsonFile(f)){ alert('请选择 .json 文件。'); return; }
+
+      await handleFile(f);
+
+    };
+
+    document.body.appendChild(input);
+
+    input.click();
+
+  }
+
+  async function handleFile(file){
+
+    if (!file) return;
+
+    let raw;
+
+    try{ raw = await file.text(); }
+
+    catch(err){ alert('读取文件失败：' + (err?.message || err)); return; }
+
+    let data;
+
+    try{ data = JSON.parse(raw); }
+
+    catch(err){ alert('JSON解析失败。\n\n错误：' + (err?.message || err)); return; }
+
+    if (!Array.isArray(data)){ alert('JSON结构不符合预期：根节点应为数组。'); return; }
+
+    conversations = data;
+
+    buildMeta();
+
+    buildTimelineMeta();
+
+    renderList();
+
+    resetContentArea();
+
+    updateGlobalStats();
+
+    hideEmptyStateIfNeeded();
+
+    if (isMobile()) closeMobileSidebar();
+
+  }
+
+  // ====== Message extraction ======
+
+  function getMessages(conv){
+
+    if (!conv || typeof conv !== 'object') return [];
+
+    const arr = conv.chat_messages || conv.messages || conv.mapping || conv.conversation || null;
+
+    if (Array.isArray(arr)) return arr;
+
+    if (arr && typeof arr === 'object') return Object.values(arr);
+
+    return [];
+
+  }
+
+  function extractMessageText(msg){
+
+    const sender  = msg?.sender || msg?.author || msg?.role || msg?.message?.author?.role || '';
+
+    const created = msg?.created_at || msg?.create_time || msg?.timestamp || msg?.message?.create_time || null;
+
+    let thinking = '', text = '';
+
+    if (Array.isArray(msg?.content)){
+
+      for (const part of msg.content){
+
+        if (!part) continue;
+
+        const t = part.type || part.kind;
+
+        if (t === 'thinking')      thinking += (part.thinking ?? part.text ?? '').toString();
+
+        else if (t === 'text')     text     += (part.text ?? '').toString();
+
+        else {
+
+          if (typeof part.text     === 'string') text     += part.text;
+
+          if (typeof part.thinking === 'string') thinking += part.thinking;
+
+        }
+
+      }
+
+    }
+
+    if (!text && typeof msg?.text === 'string') text = msg.text;
+
+    if (!text){
+
+      const m = msg?.message;
+
+      const parts = m?.content?.parts;
+
+      if (Array.isArray(parts)) text = parts.join('\n');
+
+      const ct = m?.content?.text;
+
+      if (!text && typeof ct === 'string') text = ct;
+
+      if (!text && typeof msg?.content === 'string') text = msg.content;
+
+    }
+
+    thinking = sanitizeText(thinking);
+
+    text     = sanitizeText(text);
+
+    const dateObj = parseDate(created) || (typeof created === 'number' ? new Date(created * 1000) : null);
+
+    let who = 'unknown';
+
+    const s = String(sender).toLowerCase();
+
+    if (s.includes('human') || s.includes('user') || s === 'user')               who = 'human';
+
+    else if (s.includes('assistant') || s.includes('ai') || s === 'assistant')   who = 'assistant';
+
+    else if (s === 'system')                                                      who = 'system';
+
+    return { who, dateObj, thinking, text };
+
+  }
+
+  // ====== Build Meta ======
+
+  function buildMeta(){
+
+    convMeta = conversations.map((conv, idx) => {
+
+      const msgs = getMessages(conv);
+
+      let msgCount = 0, charCount = 0;
+
+      const created  = parseDate(conv?.created_at);
+
+      const updated  = parseDate(conv?.updated_at);
+
+      const sortDate = updated || created || null;
+
+      for (const m of msgs){
+
+        const ex = extractMessageText(m);
+
+        if (!ex.text && !ex.thinking) continue;
+
+        msgCount++;
+
+        charCount += (ex.text?.length||0) + (ex.thinking?.length||0);
+
+      }
+
+      const title = safeTitle(conv?.name ?? conv?.title ?? `对话 ${idx+1}`);
+
+      return { idx, title, created, updated, sortDate, msgCount, charCount };
+
+    }).filter(m => m.msgCount > 0 || m.charCount > 0);
+
+    convMeta.sort((a,b) => (b.sortDate?.getTime()||0) - (a.sortDate?.getTime()||0));
+
+    selectedIndex = -1;
+
+  }
+
+  // A2: buildTimelineMeta uses getEffectiveDateKey
+
+  function buildTimelineMeta(){
+
+    const map = new Map();
+
+    conversations.forEach((conv, idx) => {
+
+      const title = safeTitle(conv?.name ?? conv?.title ?? `对话 ${idx+1}`);
+
+      for (const m of getMessages(conv)){
+
+        const ex = extractMessageText(m);
+
+        if (!ex.text && !ex.thinking || !ex.dateObj) continue;
+
+        const dk = getEffectiveDateKey(ex.dateObj);
+
+        if (!dk) continue;
+
+        if (!map.has(dk)) map.set(dk, { dateKey:dk, msgs:[], msgCount:0, charCount:0 });
+
+        const e = map.get(dk);
+
+        e.msgs.push({ convTitle:title, convOrigIdx:idx, ex });
+
+        e.msgCount++;
+
+        e.charCount += ex.text?.length||0;
+
+      }
+
+    });
+
+    timelineMeta = Array.from(map.values()).sort((a,b) => b.dateKey.localeCompare(a.dateKey));
+
+    selectedDayKey = null;
+
+  }
+
+  function updateGlobalStats(){
+
+    const tc = convMeta.length;
+
+    const tm = convMeta.reduce((s,c) => s + (c.msgCount||0), 0);
+
+    els.statsStrip.textContent = tc
+
+      ? `${numberWithCommas(tc)} 个对话 · ${numberWithCommas(tm)} 条消息`
+
+      : '未导入';
+
+  }
+
+  // ====== M5: Global search filtering ======
+
+  function convMatchesQuery(m, q){
+
+    if (!q) return true;
+
+    if (m.title.toLowerCase().includes(q)) return true;
+
+    const msgs = getMessages(conversations[m.idx]);
+
+    return msgs.some(msg => {
+
+      const ex = extractMessageText(msg);
+
+      return (ex.text||'').toLowerCase().includes(q) || (ex.thinking||'').toLowerCase().includes(q);
+
+    });
+
+  }
+
+  function dayMatchesQuery(day, q){
+
+    if (!q) return true;
+
+    return day.msgs.some(item =>
+
+      item.convTitle.toLowerCase().includes(q) ||
+
+      (item.ex.text||'').toLowerCase().includes(q) ||
+
+      (item.ex.thinking||'').toLowerCase().includes(q)
+
+    );
+
+  }
+
+  function getFilteredConvMeta(){
+
+    if (!searchQuery) return convMeta;
+
+    const q = searchQuery.toLowerCase();
+
+    return convMeta.filter(m => convMatchesQuery(m, q));
+
+  }
+
+  function getFilteredTimelineMeta(){
+
+    if (!searchQuery) return timelineMeta;
+
+    const q = searchQuery.toLowerCase();
+
+    return timelineMeta.filter(day => dayMatchesQuery(day, q));
+
+  }
+
+  // ====== Render List ======
+
+  function renderList(){
+
+    els.convList.innerHTML = '';
+
+    if      (viewMode === 'conv')      renderConvList();
+
+    else if (viewMode === 'timeline')  renderTimelineList();
+
+    else {
+
+      const label = viewMode === 'stats' ? '📊 月度统计' : '⭐ 已收藏消息';
+
+      els.convList.innerHTML = `<div style="padding:12px 10px;font-size:12px;color:var(--muted);font-weight:700;">${label}</div>`;
+
+    }
+
+  }
+
+  function renderConvList(){
+
+    const filtered = getFilteredConvMeta();
+
+    if (!filtered.length){
+
+      els.convList.innerHTML = `<div style="padding:12px 10px;font-size:12px;color:var(--muted);font-weight:700;">${convMeta.length ? '无匹配对话' : '暂无对话'}</div>`;
+
+      return;
+
+    }
+
+    filtered.forEach(m => {
+
+      const item = document.createElement('div');
+
+      item.className = 'convItem';
+
+      item.dataset.origIdx = String(m.idx);
+
+      item.innerHTML = `
+
+        <div class="collapsedDot"></div>
+
+        <div class="convItemTitle"></div>
+
+        <div class="convItemMeta">
+
+          <span>💬 ${numberWithCommas(m.msgCount)}</span>
+
+          <span>📝 ${numberWithCommas(m.charCount)}字</span>
+
+          <span>📅 ${m.sortDate ? fmtDate(m.sortDate) : '—'}</span>
+
+        </div>
+
+      `;
+
+      item.querySelector('.convItemTitle').textContent = m.title;
+
+      const realDi = convMeta.indexOf(m);
+
+      if (realDi === selectedIndex) item.classList.add('active');
+
+      item.addEventListener('click', () => {
+
+        selectConversation(realDi);
+
+        if (isMobile()) closeMobileSidebar();
+
+      });
+
+      els.convList.appendChild(item);
+
+    });
+
+  }
+
+  // M3: Timeline list with monthly collapsible groups
+
+  function renderTimelineList(){
+
+    const filtered = getFilteredTimelineMeta();
+
+    if (!filtered.length){
+
+      els.convList.innerHTML = `<div style="padding:12px 10px;font-size:12px;color:var(--muted);font-weight:700;">${timelineMeta.length ? '无匹配日期' : '暂无数据'}</div>`;
+
+      return;
+
+    }
+
+    // Group by month
+
+    const monthMap = new Map();
+
+    for (const day of filtered){
+
+      const mk = day.dateKey.slice(0, 7);
+
+      if (!monthMap.has(mk)) monthMap.set(mk, []);
+
+      monthMap.get(mk).push(day);
+
+    }
+
+    const monthKeys = [...monthMap.keys()].sort((a,b) => b.localeCompare(a));
+
+    const mostRecent = monthKeys[0];
+
+    for (const mk of monthKeys){
+
+      const days = monthMap.get(mk);
+
+      const totalMsgs = days.reduce((s,d) => s + d.msgCount, 0);
+
+      const isOpen = mk === mostRecent;
+
+      const group = document.createElement('div');
+
+      group.className = 'monthGroup' + (isOpen ? ' open' : '');
+
+      const header = document.createElement('div');
+
+      header.className = 'monthGroupHeader';
+
+      header.innerHTML = `
+
+        <span class="monthGroupChev">▶</span>
+
+        <span class="monthGroupLabel">${fmtMonthCN(mk)}</span>
+
+        <span class="monthGroupMeta">${numberWithCommas(totalMsgs)}条</span>
+
+      `;
+
+      header.addEventListener('click', () => group.classList.toggle('open'));
+
+      const daysDiv = document.createElement('div');
+
+      daysDiv.className = 'monthGroupDays';
+
+      for (const day of days){
+
+        const item = document.createElement('div');
+
+        item.className = 'timelineDay';
+
+        item.dataset.dayKey = day.dateKey;
+
+        if (day.dateKey === selectedDayKey) item.classList.add('active');
+
+        item.innerHTML = `
+
+          <div class="collapsedDot"></div>
+
+          <div class="timelineDayDate">📅 ${fmtDateCN(day.dateKey)}</div>
+
+          <div class="timelineDayMeta">💬 ${numberWithCommas(day.msgCount)} 条</div>
+
+        `;
+
+        item.addEventListener('click', () => {
+
+          selectDay(day.dateKey);
+
+          if (isMobile()) closeMobileSidebar();
+
+        });
+
+        daysDiv.appendChild(item);
+
+      }
+
+      group.appendChild(header);
+
+      group.appendChild(daysDiv);
+
+      els.convList.appendChild(group);
+
+    }
+
+  }
+
+  function refreshActiveHighlight(){
+
+    if (viewMode === 'conv'){
+
+      els.convList.querySelectorAll('.convItem').forEach(el => {
+
+        const isActive = parseInt(el.dataset.origIdx) === convMeta[selectedIndex]?.idx;
+
+        el.classList.toggle('active', isActive);
+
+      });
+
+    } else if (viewMode === 'timeline'){
+
+      els.convList.querySelectorAll('.timelineDay').forEach(el => {
+
+        el.classList.toggle('active', el.dataset.dayKey === selectedDayKey);
+
+      });
+
+    }
+
+  }
+
+  // ====== Content area ======
+
+  function resetContentArea(){
+
+    els.content.innerHTML = `
+
+      <div class="emptyState">
+
+        <div style="text-align:center;color:var(--muted);">
+
+          <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">已导入 ✅</div>
+
+          <div style="font-size:13px;font-weight:700;line-height:1.6;">点左侧列表加载对话内容</div>
+
+        </div>
+
+      </div>`;
+
+    els.currentConvTitle.textContent = '尚未选择对话';
+
+    els.currentConvSub.textContent = '';
+
+    updateSearchBadge(0, true);
+
+  }
+
+  function hideEmptyStateIfNeeded(){
+
+    if (convMeta.length) els.emptyState?.classList.add('hidden');
+
+  }
+
+  // A4: Create message bubble with star button
+
+  function createMessageBubble(ex, convOrigIdx, msgIdx){
+
+    const isHuman = ex.who === 'human';
+
+    const isAI    = ex.who === 'assistant';
+
+    const row = document.createElement('div');
+
+    row.className = 'msgRow ' + (isHuman ? 'human' : 'ai');
+
+    const bubble = document.createElement('div');
+
+    bubble.className = 'bubble ' + (isHuman ? 'human' : 'ai');
+
+    const favKey = (convOrigIdx !== undefined && msgIdx !== undefined)
+
+      ? `${convOrigIdx}::${msgIdx}` : null;
+
+    if (favKey) bubble.dataset.msgKey = favKey;
+
+    // Star button (A4)
+
+    if (favKey !== null){
+
+      const isFaved = favorites.has(favKey);
+
+      const star = document.createElement('button');
+
+      star.className = 'starBtn' + (isFaved ? ' starred' : '');
+
+      star.title = isFaved ? '取消收藏' : '收藏';
+
+      star.textContent = isFaved ? '⭐' : '☆';
+
+      star.addEventListener('click', e => {
+
+        e.stopPropagation();
+
+        toggleFavorite(favKey, convOrigIdx, ex, star);
+
+      });
+
+      bubble.appendChild(star);
+
+    }
+
+    // Header: sender tag + time
+
+    const header = document.createElement('div');
+
+    header.className = 'bubbleHeader';
+
+    const senderEl = document.createElement('span');
+
+    senderEl.className = 'senderTag ' + (isHuman ? 'human' : 'ai');
+
+    senderEl.textContent = isHuman ? settings.humanName : (isAI ? settings.aiName : '其他');
+
+    const timeEl = document.createElement('span');
+
+    timeEl.className = 'bubbleTime';
+
+    timeEl.textContent = ex.dateObj ? fmtDateTime(ex.dateObj) : '—';
+
+    header.appendChild(senderEl);
+
+    header.appendChild(timeEl);
+
+    // Body
+
+    const body = document.createElement('div');
+
+    body.className = 'bubbleBody';
+
+    if (isAI && ex.thinking?.trim()){
+
+      const tw  = document.createElement('div');   tw.className  = 'thinkingWrap';
+
+      const btn = document.createElement('button'); btn.className = 'thinkingToggle'; btn.type = 'button';
+
+      const lbl = document.createElement('span');   lbl.textContent = '💭 查看思考过程';
+
+      const chev = document.createElement('span');  chev.className = 'chev'; chev.textContent = '▶';
+
+      btn.appendChild(lbl); btn.appendChild(chev);
+
+      const tc = document.createElement('div');     tc.className = 'thinkingContent'; tc.textContent = ex.thinking;
+
+      btn.addEventListener('click', () => tw.classList.toggle('open'));
+
+      tw.appendChild(btn); tw.appendChild(tc);
+
+      body.appendChild(tw);
+
+    }
+
+    const textEl = document.createElement('div');
+
+    textEl.className = 'msgText';
+
+    textEl.textContent = ex.text || '';
+
+    body.appendChild(textEl);
+
+    bubble.appendChild(header);
+
+    bubble.appendChild(body);
+
+    row.appendChild(bubble);
+
+    return row;
+
+  }
+
+  // A4: Toggle favorite
+
+  function toggleFavorite(key, convOrigIdx, ex, starBtn){
+
+    const cm = convMeta.find(m => m.idx === convOrigIdx);
+
+    if (favorites.has(key)){
+
+      favorites.delete(key);
+
+      delete favMeta[key];
+
+      starBtn.classList.remove('starred');
+
+      starBtn.textContent = '☆';
+
+      starBtn.title = '收藏';
+
+    } else {
+
+      favorites.add(key);
+
+      favMeta[key] = {
+
+        key, convOrigIdx,
+
+        convTitle: cm?.title || '未知对话',
+
+        snippet:   (ex.text||'').slice(0, 150),
+
+        dateStr:   ex.dateObj ? fmtDateTime(ex.dateObj) : '—',
+
+        who:       ex.who,
+
+      };
+
+      starBtn.classList.add('starred');
+
+      starBtn.textContent = '⭐';
+
+      starBtn.title = '取消收藏';
+
+    }
+
+    persistFavorites();
+
+    // If favorites view is open, refresh count in sub
+
+    if (viewMode === 'favorites') els.currentConvSub.textContent = `${favorites.size} 条已收藏`;
+
+  }
+
+  // ====== Select conversation ======
+
+  function selectConversation(displayIndex){
+
+    selectedIndex = displayIndex;
+
+    refreshActiveHighlight();
+
+    const meta = convMeta[displayIndex];
+
+    if (!meta) return;
+
+    els.currentConvTitle.textContent = meta.title;
+
+    els.currentConvSub.textContent =
+
+      `📅 ${meta.sortDate ? fmtDateTime(meta.sortDate) : '—'} · 💬 ${numberWithCommas(meta.msgCount)}条 · ✍️ ${numberWithCommas(meta.charCount)}字`;
+
+    const msgsRaw = getMessages(conversations[meta.idx]);
+
+    els.content.innerHTML = '';
+
+    const frag = document.createDocumentFragment();
+
+    const allEx = [];
+
+    let msgIdx = 0;
+
+    for (const m of msgsRaw){
+
+      const ex = extractMessageText(m);
+
+      if (!ex.text && !ex.thinking) continue;
+
+      if (ex.who !== 'human' && ex.who !== 'assistant') ex.who = 'assistant';
+
+      frag.appendChild(createMessageBubble(ex, meta.idx, msgIdx));
+
+      allEx.push(ex);
+
+      msgIdx++;
+
+    }
+
+    if (!allEx.length){
+
+      els.content.innerHTML = `<div class="emptyState"><div style="color:var(--muted);font-weight:700;">没有可显示的消息</div></div>`;
+
+    } else {
+
+      const bar = document.createElement('div');   bar.className = 'exportBar';
+
+      const btn = document.createElement('button'); btn.className = 'btn export-btn'; btn.textContent = '💾 导出为 TXT';
+
+      btn.addEventListener('click', () => exportConversationTxt(meta, allEx));
+
+      bar.appendChild(btn);
+
+      frag.appendChild(bar);
+
+      els.content.appendChild(frag);
+
+    }
+
+    applySearch();
+
+    els.content.scrollTo({ top:0, behavior:'smooth' });
+
+  }
+
+  // M4: selectDay with collapsible conversation blocks
+
+  function selectDay(dateKey){
+
+    selectedDayKey = dateKey;
+
+    refreshActiveHighlight();
+
+    const dayData = timelineMeta.find(d => d.dateKey === dateKey);
+
+    if (!dayData) return;
+
+    els.currentConvTitle.textContent = `📅 ${fmtDateCN(dateKey)}`;
+
+    els.currentConvSub.textContent = `时间轴视图 · 💬 ${numberWithCommas(dayData.msgCount)}条`;
+
+    els.content.innerHTML = '';
+
+    const frag = document.createDocumentFragment();
+
+    const sep = document.createElement('div');
+
+    sep.className = 'timelineSep';
+
+    sep.textContent = fmtDateCN(dateKey);
+
+    frag.appendChild(sep);
+
+    // Group messages by conversation
+
+    const convGroups = [];
+
+    const seenConv = new Map();
+
+    for (const item of dayData.msgs){
+
+      if (!seenConv.has(item.convOrigIdx)){
+
+        const g = { convTitle:item.convTitle, convOrigIdx:item.convOrigIdx, items:[] };
+
+        seenConv.set(item.convOrigIdx, g);
+
+        convGroups.push(g);
+
+      }
+
+      seenConv.get(item.convOrigIdx).items.push(item);
+
+    }
+
+    // M4: each group = collapsible block, default open
+
+    for (const group of convGroups){
+
+      const block = document.createElement('div');
+
+      block.className = 'convBlock open';
+
+      const blockHead = document.createElement('div');
+
+      blockHead.className = 'convBlockHeader';
+
+      blockHead.innerHTML = `
+
+        <span class="convBlockChev">▶</span>
+
+        <span class="convBlockTitle"></span>
+
+        <span class="convBlockCount">${group.items.length}条</span>
+
+      `;
+
+      blockHead.querySelector('.convBlockTitle').textContent = group.convTitle;
+
+      blockHead.addEventListener('click', () => block.classList.toggle('open'));
+
+      const blockBody = document.createElement('div');
+
+      blockBody.className = 'convBlockBody';
+
+      let msgIdx = 0;
+
+      for (const item of group.items){
+
+        const ex = item.ex;
+
+        if (ex.who !== 'human' && ex.who !== 'assistant') ex.who = 'assistant';
+
+        blockBody.appendChild(createMessageBubble(ex, group.convOrigIdx, msgIdx++));
+
+      }
+
+      block.appendChild(blockHead);
+
+      block.appendChild(blockBody);
+
+      frag.appendChild(block);
+
+    }
+
+    const bar = document.createElement('div');   bar.className = 'exportBar';
+
+    const btn = document.createElement('button'); btn.className = 'btn export-btn'; btn.textContent = '💾 导出当日对话 TXT';
+
+    btn.addEventListener('click', () => exportDayTxt(dateKey, convGroups));
+
+    bar.appendChild(btn);
+
+    frag.appendChild(bar);
+
+    els.content.appendChild(frag);
+
+    applySearch();
+
+    els.content.scrollTo({ top:0, behavior:'smooth' });
+
+  }
+
+  // A3: Stats view
+
+  function renderStatsView(){
+
+    els.currentConvTitle.textContent = '📊 月度统计';
+
+    els.currentConvSub.textContent = '';
+
+    updateSearchBadge(0, true);
+
+    if (!conversations.length){
+
+      els.content.innerHTML = `<div class="emptyState"><div style="color:var(--muted);font-weight:700;">请先导入数据</div></div>`;
+
+      return;
+
+    }
+
+    // Build monthly aggregation — track human vs assistant separately
+
+    const monthMap = new Map();
+
+    let totalHumanMsgs = 0, totalHumanChars = 0;
+
+    let totalAiMsgs = 0,    totalAiChars = 0;
+
+    conversations.forEach((conv, idx) => {
+
+      for (const m of getMessages(conv)){
+
+        const ex = extractMessageText(m);
+
+        if (!ex.text && !ex.thinking || !ex.dateObj) continue;
+
+        const mk = getEffectiveDateKey(ex.dateObj).slice(0, 7);
+
+        if (!monthMap.has(mk)) monthMap.set(mk, { convs:new Set(), msgs:0, chars:0, humanMsgs:0, humanChars:0, aiMsgs:0, aiChars:0 });
+
+        const e = monthMap.get(mk);
+
+        e.convs.add(idx);
+
+        e.msgs++;
+
+        e.chars += ex.text?.length||0;
+
+        if (ex.who === 'human'){
+
+          e.humanMsgs++; e.humanChars += ex.text?.length||0;
+
+          totalHumanMsgs++; totalHumanChars += ex.text?.length||0;
+
+        } else {
+
+          e.aiMsgs++; e.aiChars += ex.text?.length||0;
+
+          totalAiMsgs++; totalAiChars += ex.text?.length||0;
+
+        }
+
+      }
+
+    });
+
+    const monthData = Array.from(monthMap.entries())
+
+      .map(([mk, v]) => ({ month:mk, convCount:v.convs.size, msgCount:v.msgs, charCount:v.chars,
+
+        humanMsgs:v.humanMsgs, humanChars:v.humanChars, aiMsgs:v.aiMsgs, aiChars:v.aiChars }))
+
+      .sort((a,b) => a.month.localeCompare(b.month));
+
+    if (!monthData.length){
+
+      els.content.innerHTML = `<div class="emptyState"><div style="color:var(--muted);font-weight:700;">暂无有时间戳的消息</div></div>`;
+
+      return;
+
+    }
+
+    const maxMsgs = Math.max(...monthData.map(d => d.msgCount), 1);
+
+    const n = monthData.length;
+
+    const barW = Math.max(14, Math.min(44, Math.floor(560 / n) - 8));
+
+    const gap  = Math.max(5, Math.floor(barW * 0.35));
+
+    const padL = 10, padR = 10, padT = 18, padB = 34;
+
+    const innerH = 140;
+
+    const totalW = n * (barW + gap) - gap + padL + padR;
+
+    const totalH = innerH + padT + padB;
+
+    const NS = 'http://www.w3.org/2000/svg';
+
+    const svg = document.createElementNS(NS, 'svg');
+
+    svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+    svg.style.cssText = 'width:100%;height:auto;overflow:visible;display:block;';
+
+    monthData.forEach((d, i) => {
+
+      const x    = padL + i * (barW + gap);
+
+      const barH = Math.max(2, Math.round((d.msgCount / maxMsgs) * innerH));
+
+      const y    = padT + (innerH - barH);
+
+      const rect = document.createElementNS(NS, 'rect');
+
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+
+      rect.setAttribute('width', barW); rect.setAttribute('height', barH);
+
+      rect.setAttribute('rx', '4');
+
+      rect.setAttribute('fill', 'rgba(232,101,26,.70)');
+
+      rect.style.cursor = 'default';
+
+      rect.addEventListener('mouseenter', () => rect.setAttribute('fill','rgba(232,101,26,.95)'));
+
+      rect.addEventListener('mouseleave', () => rect.setAttribute('fill','rgba(232,101,26,.70)'));
+
+      // tooltip title
+
+      const title = document.createElementNS(NS, 'title');
+
+      title.textContent = `${fmtMonthCN(d.month)}\n消息：${d.msgCount}\n对话：${d.convCount}\n字符：${d.charCount}`;
+
+      rect.appendChild(title);
+
+      // count above bar (only if bar is tall enough)
+
+      if (barH > 18){
+
+        const cnt = document.createElementNS(NS, 'text');
+
+        cnt.setAttribute('x', x + barW/2); cnt.setAttribute('y', y - 4);
+
+        cnt.setAttribute('text-anchor', 'middle');
+
+        cnt.setAttribute('font-size', '8.5'); cnt.setAttribute('opacity', '.65');
+
+        cnt.setAttribute('fill', 'currentColor');
+
+        cnt.textContent = d.msgCount > 999 ? `${(d.msgCount/1000).toFixed(1)}k` : d.msgCount;
+
+        svg.appendChild(cnt);
+
+      }
+
+      // month label below
+
+      const [yr, mo] = d.month.split('-');
+
+      const lbl = document.createElementNS(NS, 'text');
+
+      lbl.setAttribute('x', x + barW/2); lbl.setAttribute('y', padT + innerH + 14);
+
+      lbl.setAttribute('text-anchor', 'middle');
+
+      lbl.setAttribute('font-size', n > 18 ? '7.5' : '9');
+
+      lbl.setAttribute('opacity', '.55'); lbl.setAttribute('fill', 'currentColor');
+
+      lbl.textContent = n > 24 ? mo : `${parseInt(mo)}月`;
+
+      svg.appendChild(rect);
+
+      svg.appendChild(lbl);
+
+    });
+
+    // Build DOM
+
+    const wrap = document.createElement('div');
+
+    wrap.className = 'statsView';
+
+    const totalMsgs  = convMeta.reduce((s,m) => s+m.msgCount, 0);
+
+    const totalChars  = convMeta.reduce((s,m) => s+m.charCount, 0);
+
+    const hdr = document.createElement('div');
+
+    hdr.className = 'statsViewHead';
+
+    hdr.innerHTML = `
+
+      <h2>月度统计</h2>
+
+      <p>共 ${numberWithCommas(monthData.length)} 个月份 · ${numberWithCommas(convMeta.length)} 个对话 · ${numberWithCommas(totalMsgs)} 条消息 · ${numberWithCommas(totalChars)} 字符</p>
+
+    `;
+
+    // User vs AI summary card
+
+    const summaryCard = document.createElement('div');
+
+    summaryCard.className = 'chartCard';
+
+    summaryCard.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:16px;';
+
+    summaryCard.innerHTML = `
+
+      <div>
+
+        <div style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">${settings.humanName}</div>
+
+        <div style="font-size:22px;font-weight:900;color:var(--text);line-height:1;">${numberWithCommas(totalHumanMsgs)}</div>
+
+        <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">条消息</div>
+
+        <div style="font-size:16px;font-weight:800;color:var(--text);margin-top:8px;">${numberWithCommas(totalHumanChars)}</div>
+
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">字符</div>
+
+      </div>
+
+      <div>
+
+        <div style="font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">${settings.aiName}</div>
+
+        <div style="font-size:22px;font-weight:900;color:var(--text);line-height:1;">${numberWithCommas(totalAiMsgs)}</div>
+
+        <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">条消息</div>
+
+        <div style="font-size:16px;font-weight:800;color:var(--text);margin-top:8px;">${numberWithCommas(totalAiChars)}</div>
+
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">字符</div>
+
+      </div>
+
+    `;
+
+    wrap.appendChild(hdr);
+
+    wrap.appendChild(summaryCard);
+
+    const chartCard = document.createElement('div');
+
+    chartCard.className = 'chartCard';
+
+    chartCard.innerHTML = '<h3>每月消息数</h3>';
+
+    chartCard.appendChild(svg);
+
+    wrap.appendChild(chartCard);
+
+    const tableCard = document.createElement('div');
+
+    tableCard.className = 'tableCard';
+
+    const table = document.createElement('table');
+
+    table.className = 'statsTable';
+
+    table.innerHTML = `<thead><tr><th>月份</th><th>对话</th><th>消息</th><th>${settings.humanName}</th><th>${settings.aiName}</th><th>字符</th></tr></thead>`;
+
+    const tbody = document.createElement('tbody');
+
+    [...monthData].reverse().forEach(d => {
+
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `<td>${fmtMonthCN(d.month)}</td><td>${numberWithCommas(d.convCount)}</td><td>${numberWithCommas(d.msgCount)}</td><td>${numberWithCommas(d.humanMsgs)}</td><td>${numberWithCommas(d.aiMsgs)}</td><td>${numberWithCommas(d.charCount)}</td>`;
+
+      tbody.appendChild(tr);
+
+    });
+
+    table.appendChild(tbody);
+
+    tableCard.appendChild(table);
+
+    wrap.appendChild(tableCard);
+
+    els.content.innerHTML = '';
+
+    els.content.appendChild(wrap);
+
+    els.content.scrollTo({ top:0, behavior:'smooth' });
+
+  }
+
+  // A4: Favorites view
+
+  function renderFavoritesView(){
+
+    els.currentConvTitle.textContent = '⭐ 收藏消息';
+
+    els.currentConvSub.textContent = `${favorites.size} 条已收藏`;
+
+    updateSearchBadge(0, true);
+
+    els.content.innerHTML = '';
+
+    if (!favorites.size){
+
+      els.content.innerHTML = `<div class="emptyState"><div style="text-align:center;color:var(--muted);">
+
+        <div style="font-size:32px;margin-bottom:10px;">☆</div>
+
+        <div style="font-size:14px;font-weight:800;color:var(--text);">暂无收藏</div>
+
+        <div style="font-size:12.5px;margin-top:6px;">点击消息气泡右上角的 ☆ 即可收藏</div>
+
+      </div></div>`;
+
+      return;
+
+    }
+
+    const frag = document.createDocumentFragment();
+
+    Object.values(favMeta)
+
+      .sort((a,b) => (b.dateStr||'').localeCompare(a.dateStr||''))
+
+      .forEach(fav => {
+
+        const card = document.createElement('div');
+
+        card.className = 'favCard';
+
+        const senderLabel = fav.who === 'human' ? settings.humanName : settings.aiName;
+
+        const meta = document.createElement('div');
+
+        meta.className = 'favCardMeta';
+
+        meta.innerHTML = `<span class="favCardSender">${senderLabel}</span><span>·</span><span>${fav.dateStr}</span><span>·</span><span class="favCardConv"></span>`;
+
+        meta.querySelector('.favCardConv').textContent = fav.convTitle;
+
+        const textEl = document.createElement('div');
+
+        textEl.className = 'favCardText';
+
+        textEl.textContent = fav.snippet;
+
+        const actions = document.createElement('div');
+
+        actions.className = 'favCardActions';
+
+        const jumpBtn = document.createElement('button');
+
+        jumpBtn.className = 'favJumpBtn';
+
+        jumpBtn.textContent = '↗ 跳转到对话';
+
+        jumpBtn.addEventListener('click', () => {
+
+          switchView('conv');
+
+          const di = convMeta.findIndex(m => m.idx === fav.convOrigIdx);
+
+          if (di >= 0){
+
+            selectConversation(di);
+
+            setTimeout(() => {
+
+              const target = els.content.querySelector(`[data-msg-key="${fav.key}"]`);
+
+              if (target) target.scrollIntoView({ behavior:'smooth', block:'center' });
+
+            }, 120);
+
+          }
+
+        });
+
+        const unstarBtn = document.createElement('button');
+
+        unstarBtn.className = 'favUnstarBtn';
+
+        unstarBtn.title = '取消收藏';
+
+        unstarBtn.textContent = '⭐';
+
+        unstarBtn.addEventListener('click', () => {
+
+          favorites.delete(fav.key);
+
+          delete favMeta[fav.key];
+
+          persistFavorites();
+
+          renderFavoritesView();
+
+        });
+
+        actions.appendChild(jumpBtn);
+
+        actions.appendChild(unstarBtn);
+
+        card.appendChild(meta);
+
+        card.appendChild(textEl);
+
+        card.appendChild(actions);
+
+        frag.appendChild(card);
+
+      });
+
+    els.content.appendChild(frag);
+
+    els.content.scrollTo({ top:0, behavior:'smooth' });
+
+  }
+
+  // ====== View switch ======
+
+  function switchView(mode){
+
+    viewMode = mode;
+
+    els.tabConv.classList.toggle('active',      mode === 'conv');
+
+    els.tabTimeline.classList.toggle('active',  mode === 'timeline');
+
+    els.tabStats.classList.toggle('active',     mode === 'stats');
+
+    els.tabFav.classList.toggle('active',       mode === 'favorites');
+
+    if (mode === 'conv')           selectedDayKey = null;
+
+    else if (mode === 'timeline')  selectedIndex  = -1;
+
+    renderList();
+
+    if      (mode === 'stats')     renderStatsView();
+
+    else if (mode === 'favorites') renderFavoritesView();
+
+    else                           resetContentArea();
+
+  }
+
+  // ====== M5: Search ======
+
+  function clearMarks(){
+
+    els.content.querySelectorAll('mark').forEach(m => {
+
+      m.parentNode.replaceChild(document.createTextNode(m.textContent), m);
+
+    });
+
+    matchNodes = [];
+
+  }
+
+  function highlightInElement(el, query){
+
+    if (!query) return 0;
+
+    const textNodes = [];
+
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+
+      acceptNode: node => {
+
+        if (!node.nodeValue?.trim()) return NodeFilter.FILTER_REJECT;
+
+        const p = node.parentElement;
+
+        if (!p || p.tagName === 'SCRIPT' || p.tagName === 'STYLE') return NodeFilter.FILTER_REJECT;
+
+        return NodeFilter.FILTER_ACCEPT;
+
+      }
+
+    });
+
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    const re = new RegExp(escapeForRegex(query), 'gi');
+
+    let count = 0;
+
+    for (const node of textNodes){
+
+      const value = node.nodeValue;
+
+      if (!re.test(value)) continue;
+
+      re.lastIndex = 0;
+
+      const frag = document.createDocumentFragment();
+
+      let lastIndex = 0, match;
+
+      while ((match = re.exec(value)) !== null){
+
+        const start = match.index, end = start + match[0].length;
+
+        if (start > lastIndex) frag.appendChild(document.createTextNode(value.slice(lastIndex, start)));
+
+        const mark = document.createElement('mark');
+
+        mark.textContent = value.slice(start, end);
+
+        frag.appendChild(mark);
+
+        matchNodes.push(mark);
+
+        count++;
+
+        lastIndex = end;
+
+      }
+
+      if (lastIndex < value.length) frag.appendChild(document.createTextNode(value.slice(lastIndex)));
+
+      node.parentNode.replaceChild(frag, node);
+
+    }
+
+    return count;
+
+  }
+
+  function updateSearchBadge(count, hide){
+
+    els.searchBadge.classList.toggle('hidden', !!hide);
+
+    els.searchBadge.textContent = `🔎 ${numberWithCommas(count)}`;
+
+  }
+
+  function applySearch(){
+
+    const q = (els.searchInput.value || '').trim();
+
+    const prevQuery = searchQuery;
+
+    searchQuery = q;
+
+    clearMarks();
+
+    // M5: re-render sidebar list to filter results
+
+    if (q !== prevQuery && (viewMode === 'conv' || viewMode === 'timeline')){
+
+      renderList();
+
+    }
+
+    if (!q){ updateSearchBadge(0, true); return; }
+
+    const count = highlightInElement(els.content, q);
+
+    updateSearchBadge(count, !count);
+
+    if (matchNodes.length) matchNodes[0].scrollIntoView({ behavior:'smooth', block:'center' });
+
+  }
+
+  // ====== Settings panel (A1, A2, A8) ======
+
+  function openSettings(){
+
+    els.setHumanName.value = settings.humanName;
+
+    els.setAiName.value    = settings.aiName;
+
+    els.setDaySplit.value  = settings.daySplitHour;
+
+    els.setFontSize.value  = settings.fontSize;
+
+    els.fontSizeLabel.textContent = settings.fontSize + 'px';
+
+    els.setFontSize.addEventListener('input', () => {
+
+      els.fontSizeLabel.textContent = els.setFontSize.value + 'px';
+
+    });
+
+    els.settingsPanel.classList.add('open');
+
+    els.settingsBg.classList.add('show');
+
+  }
+
+  function closeSettings(){
+
+    els.settingsPanel.classList.remove('open');
+
+    els.settingsBg.classList.remove('show');
+
+  }
+
+  function saveSettings(){
+
+    const newHuman = els.setHumanName.value.trim() || '我';
+
+    const newAi    = els.setAiName.value.trim()    || 'TA';
+
+    const newSplit = Math.max(0, Math.min(12, parseInt(els.setDaySplit.value)||0));
+
+    const newFont  = Math.max(11, Math.min(20, parseInt(els.setFontSize.value)||13));
+
+    const splitChanged = newSplit !== settings.daySplitHour;
+
+    settings.humanName    = newHuman;
+
+    settings.aiName       = newAi;
+
+    settings.daySplitHour = newSplit;
+
+    settings.fontSize     = newFont;
+
+    applyFontSize();
+
+    persistSettings();
+
+    if (splitChanged && conversations.length){
+
+      buildTimelineMeta();
+
+      if (viewMode === 'timeline') renderList();
+
+    }
+
+    closeSettings();
+
+  }
+
+  // ====== Theme & Fullscreen ======
+
+  function setTheme(theme){
+
+    document.body.setAttribute('data-theme', theme);
+
+    const isDark = theme === 'dark';
+
+    els.themeBtn.innerHTML = isDark
+
+      ? '<span>☀️</span><span class="icon-label">日间</span>'
+
+      : '<span>🌙</span><span class="icon-label">夜间</span>';
+
+    try{ localStorage.setItem('cg_viewer_theme', theme); }catch(e){}
+
+  }
+
+  function toggleFullscreen(){
+
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+
+    else document.exitFullscreen?.();
+
+  }
+
+  // ====== Scroll buttons ======
+
+  function updateScrollBtns(){
+
+    const y = els.content.scrollTop;
+
+    const remain = els.content.scrollHeight - els.content.scrollTop - els.content.clientHeight;
+
+    els.toTopBtn.style.opacity    = y > 300      ? '1' : '0.25';
+
+    els.toBottomBtn.style.opacity = remain > 300 ? '1' : '0.25';
+
+  }
+
+  // ====== Export ======
+
+  function downloadTxt(filename, content){
+
+    const blob = new Blob([content], { type:'text/plain;charset=utf-8' });
+
+    const url  = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+
+    a.href = url; a.download = filename;
+
+    document.body.appendChild(a); a.click();
+
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+
+  }
+
+  function exportConversationTxt(meta, msgs){
+
+    const lines = [
+
+      `对话标题：${meta.title}`,
+
+      `导出时间：${fmtDateTime(new Date())}`,
+
+      `共 ${meta.msgCount} 条消息`,
+
+      '═'.repeat(50), ''
+
+    ];
+
+    for (const ex of msgs){
+
+      const who = ex.who === 'human' ? settings.humanName : settings.aiName;
+
+      lines.push(`[${ex.dateObj ? fmtDateTime(ex.dateObj) : '—'}] ${who}：`);
+
+      if (ex.thinking?.trim()){ lines.push('〔思考过程〕', ex.thinking.trim(), '〔思考结束〕'); }
+
+      lines.push(ex.text || '', '');
+
+    }
+
+    downloadTxt(meta.title.replace(/[\/\\:*?"<>|]/g,'_').slice(0,60) + '.txt', lines.join('\n'));
+
+  }
+
+  function exportDayTxt(dateKey, convGroups){
+
+    const lines = [`日期：${fmtDateCN(dateKey)}`, `导出时间：${fmtDateTime(new Date())}`, '═'.repeat(50), ''];
+
+    for (const group of convGroups){
+
+      lines.push(`【对话：${group.convTitle}】`, '');
+
+      for (const item of group.items){
+
+        const ex = item.ex;
+
+        const who = ex.who === 'human' ? settings.humanName : settings.aiName;
+
+        lines.push(`[${ex.dateObj ? fmtTimeShort(ex.dateObj) : '—'}] ${who}：`);
+
+        if (ex.thinking?.trim()){ lines.push('〔思考过程〕', ex.thinking.trim(), '〔思考结束〕'); }
+
+        lines.push(ex.text || '', '');
+
+      }
+
+      lines.push('');
+
+    }
+
+    downloadTxt(`${dateKey}.txt`, lines.join('\n'));
+
+  }
+
+  // ====== Demo ======
+
+  function loadDemo(){
+
+    const demo = [{
+
+      name: '示例对话：功能演示',
+
+      created_at: '2026-01-24T10:00:00Z',
+
+      updated_at: '2026-01-24T12:00:00Z',
+
+      chat_messages: [
+
+        { sender:'human',    created_at:'2026-01-24T10:05:00Z', text:'你好！我想测试一下搜索与高亮。\n这里有一个关键词：猫猫\n以及多行文本。' },
+
+        { sender:'assistant',created_at:'2026-01-24T10:06:00Z', content:[
+
+          { type:'thinking', thinking:'用户要测试搜索功能，我需要包含关键词猫猫。' },
+
+          { type:'text',     text:'当然可以！关键词：猫猫。AI回复显示在左侧。🙂' }
+
+        ]},
+
+        { sender:'human',    created_at:'2026-01-24T10:07:00Z', text:'收到，用户消息显示在右侧。' }
+
+      ]
+
+    }];
+
+    conversations = demo;
+
+    buildMeta(); buildTimelineMeta(); renderList(); resetContentArea(); updateGlobalStats(); hideEmptyStateIfNeeded();
+
+    if (isMobile()) closeMobileSidebar();
+
+  }
+
+  // ====== Drag & Drop ======
+
+  const isJsonFile = f => f && ((f.name||'').toLowerCase().endsWith('.json') || f.type.includes('json'));
+
+  const showDropOverlay = show => els.dropOverlay.classList.toggle('show', !!show);
+
+  // ====== Events ======
+
+  els.toggleBtn.addEventListener('click', () => setSidebarCollapsed(!sidebarCollapsed));
+
+  els.mobileSidebarBtn.addEventListener('click', openMobileSidebar);
+
+  els.sidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+  els.chooseBtn.addEventListener('click',   openFilePicker);
+
+  els.reimportBtn.addEventListener('click', openFilePicker);
+
+  els.demoBtn.addEventListener('click',     loadDemo);
+
+  els.tabConv.addEventListener('click',     () => switchView('conv'));
+
+  els.tabTimeline.addEventListener('click', () => switchView('timeline'));
+
+  els.tabStats.addEventListener('click',    () => switchView('stats'));
+
+  els.tabFav.addEventListener('click',      () => switchView('favorites'));
+
+  els.searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') applySearch(); });
+
+  els.searchInput.addEventListener('input', () => {
+
+    clearTimeout(els.searchInput._t);
+
+    els.searchInput._t = setTimeout(applySearch, 300);
+
+  });
+
+  els.clearSearchBtn.addEventListener('click', () => {
+
+    els.searchInput.value = '';
+
+    applySearch();
+
+    els.searchInput.focus();
+
+  });
+
+  els.themeBtn.addEventListener('click',      () => setTheme(document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+
+  els.settingsBtn.addEventListener('click',  openSettings);
+
+  els.spClose.addEventListener('click',      closeSettings);
+
+  els.settingsBg.addEventListener('click',   closeSettings);
+
+  els.spSaveBtn.addEventListener('click',    saveSettings);
+
+  els.toTopBtn.addEventListener('click',    () => els.content.scrollTo({ top:0, behavior:'smooth' }));
+
+  els.toBottomBtn.addEventListener('click', () => els.content.scrollTo({ top:els.content.scrollHeight, behavior:'smooth' }));
+
+  els.content.addEventListener('scroll', updateScrollBtns);
+
+  els.dropZone.addEventListener('click',   openFilePicker);
+
+  els.dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openFilePicker(); });
+
+  window.addEventListener('dragenter', e => { e.preventDefault(); showDropOverlay(true); });
+
+  window.addEventListener('dragover',  e => e.preventDefault());
+
+  window.addEventListener('dragleave', e => { if (!e.relatedTarget) showDropOverlay(false); });
+
+  window.addEventListener('drop', async e => {
+
+    e.preventDefault(); showDropOverlay(false);
+
+    const file = e.dataTransfer?.files?.[0];
+
+    if (!file) return;
+
+    if (!isJsonFile(file)){ alert('拖入的不是 JSON 文件。'); return; }
+
+    await handleFile(file);
+
+  });
+
+  document.addEventListener('dragover', e => e.preventDefault(), false);
+
+  document.addEventListener('drop',     e => e.preventDefault(), false);
+
+  window.addEventListener('resize', handleResize);
+
+  // ====== Init ======
+
+  (function init(){
+
+    loadSettings();
+
+    loadFavorites();
+
+    try{
+
+      const theme = localStorage.getItem('cg_viewer_theme');
+
+      if (theme === 'dark' || theme === 'light') setTheme(theme);
+
+      const sc = localStorage.getItem('sidebar_collapsed');
+
+      if (sc === '1') setSidebarCollapsed(true);
+
+    }catch(e){}
+
+    handleResize();
+
+    updateScrollBtns();
+
+  })();
+
+})();
+
+</script>
+
+</body>
+
+</html>
